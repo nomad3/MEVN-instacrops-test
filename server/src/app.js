@@ -21,6 +21,8 @@ app.use(cors())
 const mongodb_conn_module = require('./mongodbConnModule');
 var db = mongodb_conn_module.connect();
 
+//use axios to bring data from jsonplaceholder's API
+
 async function getRemotePosts() {
   
 	let res = await axios.get('https://jsonplaceholder.typicode.com/posts');
@@ -30,7 +32,9 @@ async function getRemotePosts() {
   }
   
 getRemotePosts();
-  
+
+//use axios to bring data from jsonplaceholder's API
+
 async function getRemoteUsers() {
 	
 	  let res = await axios.get('https://jsonplaceholder.typicode.com/users');
@@ -41,7 +45,11 @@ async function getRemoteUsers() {
 	
 getRemoteUsers();
 
+//Load models to work with mongoose
+
 var Post = require("../models/post");
+
+//Get all posts from mongo
 
 app.get('/posts', (req, res) => {
   Post.find({}, 'title description', function (error, posts) {
@@ -51,6 +59,8 @@ app.get('/posts', (req, res) => {
 		})
 	}).sort({_id:-1})
 })
+
+//add new post to mongo
 
 app.post('/add_post', (req, res) => {
 	var db = req.db;
@@ -71,6 +81,8 @@ app.post('/add_post', (req, res) => {
 	})
 })
 
+//edit a post in mongo
+
 app.put('/posts/:id', (req, res) => {
 	var db = req.db;
 	Post.findById(req.params.id, 'title description', function (error, post) {
@@ -89,6 +101,8 @@ app.put('/posts/:id', (req, res) => {
 	})
 })
 
+//delete a post in mongo
+
 app.delete('/posts/:id', (req, res) => {
 	var db = req.db;
 	Post.remove({
@@ -102,6 +116,8 @@ app.delete('/posts/:id', (req, res) => {
 	})
 })
 
+//Get one element in mongo
+
 app.get('/post/:id', (req, res) => {
 	var db = req.db;
 	Post.findById(req.params.id, 'title description', function (error, post) {
@@ -110,6 +126,7 @@ app.get('/post/:id', (req, res) => {
 	})
 })
 
+// set cookie expiration date
 
 const publicRoot = '../dist'
 app.use(express.static(publicRoot))
@@ -143,6 +160,8 @@ app.get("/", (req, res, next) => {
   res.sendFile("index.html", { root: publicRoot })
 })
 
+// login endpoint
+
 app.post("/login", (req, res, next) => {
     passport.authenticate('local', (err, user, info) => {
         if (err) {
@@ -159,11 +178,15 @@ app.post("/login", (req, res, next) => {
     })(req, res, next)
 })
 
+//logout endpoint
+
 app.get('/logout', function(req, res){
     req.logout();
     console.log("logged out")
     return res.send();
 });
+
+//auth middleware
 
 const authMiddleware = (req, res, next) => {
     if (!req.isAuthenticated()) {
@@ -173,6 +196,8 @@ const authMiddleware = (req, res, next) => {
     }
 }
 
+//get users endpoint from local storage
+
 app.get("/user", authMiddleware, (req, res) => {
     let user = users.find((user) => {
         return user.id === req.session.passport.user
@@ -180,6 +205,8 @@ app.get("/user", authMiddleware, (req, res) => {
     console.log([user, req.session])
     res.send({user: user})
 })
+
+//passport checks if user and password match
 
 passport.use(new LocalStrategy({
     usernameField: 'email',
@@ -210,5 +237,6 @@ passport.deserializeUser((id, done) => {
   done(null, user)
 })
 
+//api listen to pot 8081
 
 app.listen(process.env.PORT || 8081)
