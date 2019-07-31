@@ -2,38 +2,46 @@ const express = require('express')
 const bodyParser = require('body-parser')
 const cors = require('cors')
 const morgan = require('morgan')
+const axios = require('axios');
+
+// Modules for autentification
+const cookieSession = require('cookie-session')
+const passport = require('passport')
+
+// getting the local authentication type
+const LocalStrategy = require('passport-local').Strategy
 
 const app = express()
 app.use(morgan('combined'))
 app.use(bodyParser.json())
 app.use(cors())
 
+//connect with mongo db using mongoose
+
 const mongodb_conn_module = require('./mongodbConnModule');
 var db = mongodb_conn_module.connect();
 
-var Post = require("../models/post");
-
-const axios = require('axios');
-
-async function getPosts() {
+async function getRemotePosts() {
   
-  let res = await axios.get('https://jsonplaceholder.typicode.com/posts');
-
-  let pulledPosts = res.data;
-  //console.log(pulledPosts);
-}
-
-getPosts();
-
-async function getUsers() {
+	let res = await axios.get('https://jsonplaceholder.typicode.com/posts');
   
-	let res = await axios.get('https://jsonplaceholder.typicode.com/users');
-  
-	let pulledUsers = res.data;
-	//console.log(pulledUsers);
+	let pulledPosts = res.data;
+	//console.log(pulledPosts);
   }
   
-  getUsers();
+getRemotePosts();
+  
+async function getRemoteUsers() {
+	
+	  let res = await axios.get('https://jsonplaceholder.typicode.com/users');
+	
+	  let pulledUsers = res.data;
+	  //console.log(pulledUsers);
+	}
+	
+getRemoteUsers();
+
+var Post = require("../models/post");
 
 app.get('/posts', (req, res) => {
   Post.find({}, 'title description', function (error, posts) {
@@ -101,5 +109,106 @@ app.get('/post/:id', (req, res) => {
 	  res.send(post)
 	})
 })
+
+
+const publicRoot = '../dist'
+app.use(express.static(publicRoot))
+
+app.use(bodyParser.json())
+app.use(cookieSession({
+    name: 'mysession',
+    keys: ['vueauthrandomkey'],
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours 
+  }))
+
+app.use(passport.initialize());
+app.use(passport.session());
+
+let users = [
+    {
+        id: 1,
+        name: "guest",
+        email: "guest",
+        password: "guest",
+        snapshot : {
+            timestamp_login : 1551378370,
+            timestamp_logout : 1551378477,
+            state : "inactive",
+            token : ""
+            }
+    },
+]
+
+app.get("/", (req, res, next) => {
+  res.sendFile("index.html", { root: publicRoot })
+})
+
+app.post("/login", (req, res, next) => {
+    passport.authenticate('local', (err, user, info) => {
+        if (err) {
+            return next(err);
+        }
+        
+        if (!user) {
+            return res.status(400).send([user, "Cannot log in", info])
+        }
+
+        req.login(user, (err) => {
+            res.send("Logged in")
+        })
+    })(req, res, next)
+})
+
+app.get('/logout', function(req, res){
+    req.logout();
+    console.log("logged out")
+    return res.send();
+});
+
+const authMiddleware = (req, res, next) => {
+    if (!req.isAuthenticated()) {
+        res.status(401).send('You are not authenticated')
+    } else {
+        return next()
+    }
+}
+
+app.get("/user", authMiddleware, (req, res) => {
+    let user = users.find((user) => {
+        return user.id === req.session.passport.user
+    })
+    console.log([user, req.session])
+    res.send({user: user})
+})
+
+passport.use(new LocalStrategy({
+    usernameField: 'email',
+    passwordField: 'password'
+  }, 
+  (username, password, done) => {
+      let user = users.find((user) => {
+          return user.email === username && user.password === password
+      })
+      
+      if (user) {
+          done(null, user)
+      } else {
+          done(null, false, {message: 'Incorrect username or password'})
+      }
+  }
+))
+
+passport.serializeUser((user, done) => {
+  done(null, user.id)
+})
+
+passport.deserializeUser((id, done) => {
+  let user = users.find((user) => {
+      return user.id === id
+  })
+
+  done(null, user)
+})
+
 
 app.listen(process.env.PORT || 8081)
